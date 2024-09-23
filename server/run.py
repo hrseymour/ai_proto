@@ -103,17 +103,25 @@ def ask_question():
             function_name = message.function_call.name
             function_args = json.loads(message.function_call.arguments)
 
-            if function_name == 'get_population':
-                city = function_args.get('city')
-                state = function_args.get('state')
-                function_response = get_population(city, state)
+            # Retrieve the function from the function_map
+            function_to_call = function_map.get(function_name)
 
-                # Append the function response to the messages
-                messages.append({
-                    "role": "function",
-                    "name": function_name,
-                    "content": json.dumps(function_response)
-                })
+            if function_to_call:
+                # Call the function with the provided arguments
+                try:
+                    function_response = function_to_call(**function_args)
+                except Exception as e:
+                    function_response = {"error": str(e)}
+            else:
+                # Function not found
+                function_response = {"error": f"Function '{function_name}' not found."}
+
+            # Append the function response to the messages
+            messages.append({
+                "role": "function",
+                "name": function_name,
+                "content": json.dumps(function_response)
+            })
         else:
             # The assistant has provided a response; exit the loop
             break
