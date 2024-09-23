@@ -47,31 +47,32 @@ def lookup_population(city, state):
 def get_population(city, state):
     population = lookup_population(city, state)
     if population:
-        return {"population": population}
+        return {"population": str(population)}
     else:
         return {"error": "Population data not found for the given city and state."}
 
+function_map = {
+    'get_population': get_population
+}
+
 # OpenAI function definition
-tools = [
+functions = [
     {
-        "type": "function",
-        "function": {
-            "name": "get_population",
-            "description": "Get the population of a city in a given state",
-            "parameters": {
-                "type": "object",
-                "properties": {
-                    "city": {
-                        "type": "string",
-                        "description": "The name of the city"
-                    },
-                    "state": {
-                        "type": "string",
-                        "description": "The name of the state. Use capitalized two letter codes for states, e.g. 'CA' for 'California'"
-                    }
+        "name": "get_population",
+        "description": "Get the population of a city in a given state",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "city": {
+                    "type": "string",
+                    "description": "The name of the city"
                 },
-                "required": ["city", "state"]
-            }
+                "state": {
+                    "type": "string",
+                    "description": "The name of the state. Use capitalized two-letter codes for states, e.g., 'CA' for 'California'"
+                }
+            },
+            "required": ["city", "state"]
         }
     }
 ]
@@ -90,30 +91,35 @@ def ask_question():
         response = client.chat.completions.create(
             model=OPENAI_MODEL,
             messages=messages,
-            tools=tools,
-            tool_choice="auto"
+            functions=functions,
+            function_call="auto"
         )
 
         message = response.choices[0].message
-        messages.append({"role": "assistant", "content": message.content})
+        messages.append({"role": message.role, "content": message.content or "", "function_call": message.function_call})
 
-        if not message.tool_calls:
-            break
+        if message.function_call is not None:
+            # The assistant is requesting a function call
+            function_name = message.function_call.name
+            function_args = json.loads(message.function_call.arguments)
 
-        for tool_call in message.tool_calls:
-            if tool_call.function.name == 'get_population':
-                function_args = json.loads(tool_call.function.arguments)
+            if function_name == 'get_population':
                 city = function_args.get('city')
                 state = function_args.get('state')
                 function_response = get_population(city, state)
-                
+
+                # Append the function response to the messages
                 messages.append({
                     "role": "function",
-                    "name": "get_population",
+                    "name": function_name,
                     "content": json.dumps(function_response)
                 })
+        else:
+            # The assistant has provided a response; exit the loop
+            break
 
-    return jsonify({'response': messages[-1]['content']})
+    # Return the assistant's reply
+    return jsonify({'response': message.content})
 
 # Start the Flask app
 if __name__ == '__main__':
