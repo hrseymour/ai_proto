@@ -3,24 +3,13 @@ from openai import OpenAI
 import os
 import json
 
-from db import lookup_population
+from db import get_population
 
 app = Flask(__name__)
 
 client = OpenAI(api_key=os.getenv("OPEN_API_KEY"))
 OPENAI_MODEL = os.getenv("OPENAI_MODEL")
-
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = os.getenv("GROQ_MODEL")
-
-
-# Define the function that OpenAI will call
-def get_population(city, state):
-    population = lookup_population(city, state)
-    if population:
-        return {"population": str(population)}
-    else:
-        return {"error": "Population data not found for the given city and state."}
+print(OPENAI_MODEL)
 
 function_map = {
     'get_population': get_population

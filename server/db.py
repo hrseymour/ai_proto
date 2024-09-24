@@ -32,3 +32,10 @@ def lookup_population(city, state):
     else:
         return None
 
+# Define the function that OpenAI will call
+def get_population(city, state):
+    population = lookup_population(city, state)
+    if population:
+        return {"population": str(population)}
+    else:
+        return {"population": "Unknown"}
