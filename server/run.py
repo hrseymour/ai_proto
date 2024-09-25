@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Dict, Any
 
-from db import get_db_connection, lookup_city, lookup_value
+from db import init_db_pool, lookup_city, lookup_value
 
 app = Flask(__name__)
 
@@ -17,7 +17,7 @@ logging.basicConfig(
 )
 app.debug = True
 
-get_db_connection()  # pre-open
+init_db_pool()  # pre-open
 
 with open('config.yaml', 'r') as f:
     config = yaml.safe_load(f)
@@ -109,4 +109,4 @@ def ask_question():
 
 # Start the Flask app
 if __name__ == '__main__':
-        app.run(port=5000, debug=True)
+        app.run(port=8080, debug=True)

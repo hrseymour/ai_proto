@@ -1,4 +1,4 @@
-import psycopg2
+from psycopg2 import pool
 import os
 import logging
 from typing import Dict, Tuple, Any
@@ -10,31 +10,44 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-conn = None  # Initialize a global connection variable
 
-def get_db_connection():
-    global conn 
+# Create a connection pool
+connection_pool = None
 
-    if conn is None or conn.closed:
-        conn = psycopg2.connect(
+def init_db_pool():
+    global connection_pool
+    if connection_pool is None:
+        connection_pool = pool.SimpleConnectionPool(
+            1, 20,  # Min 1, Max 20 connections
             host=DB_HOST,
             port=DB_PORT,
             dbname=DB_NAME,
             user=DB_USER,
             password=DB_PASSWORD
         )
-    return conn
+
+def get_db_connection():
+    global connection_pool
+    if connection_pool is None:
+        init_db_pool()
+    return connection_pool.getconn()
+
+def release_db_connection(conn):
+    global connection_pool
+    if connection_pool:
+        connection_pool.putconn(conn)
 
 def select(query: str, params: Tuple[Any, ...]) -> Dict[str, Any]:
     logging.info(f"SELECT {params}")
     
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute(query, params)
     
+    cursor.execute(query, params)
     cols = [desc[0] for desc in cursor.description]
     result = cursor.fetchone()
-    conn.close()
+
+    release_db_connection(conn)  # Return connection to pool
 
     logging.info(f"SELECT complete")
 

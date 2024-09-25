@@ -7,7 +7,7 @@ import os
 import logging
 from typing import Dict, Any
 
-from db import get_db_connection, lookup_city, lookup_value
+from db import init_db_pool, lookup_city, lookup_value
 
 app = Flask(__name__)
 
@@ -18,7 +18,7 @@ logging.basicConfig(
 )
 app.debug = True
 
-get_db_connection()  # pre-open
+init_db_pool()  # pre-open
 
 @tool
 def lookup_city_tool(city: str, state: str) -> Dict[str, Any]:
@@ -157,4 +157,4 @@ def ask_question():
 
 # Run the app
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(port=8080, debug=True)
