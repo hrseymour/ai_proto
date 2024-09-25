@@ -1,55 +1,73 @@
 from flask import Flask, request, jsonify
 from openai import OpenAI
+import yaml
 import os
 import json
+import logging
+from typing import Dict, Any
 
-from db import get_population
+from db import lookup_city, lookup_value
 
 app = Flask(__name__)
 
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[logging.StreamHandler()]
+)
+app.debug = True
+
+with open('config.yaml', 'r') as f:
+    config = yaml.safe_load(f)
+
 client = OpenAI(api_key=os.getenv("OPEN_API_KEY"))
-OPENAI_MODEL = os.getenv("OPENAI_MODEL")
-print(OPENAI_MODEL)
 
 function_map = {
-    'get_population': get_population
+    'lookup_city': lookup_city,
+    'lookup_value': lookup_value,
 }
 
-# OpenAI function definition
 functions = [
     {
-        "name": "get_population",
-        "description": "Get the population of a city in a given state",
+        "name": "lookup_city",
+        "description": config['functions']['lookup_city']['description'],
         "parameters": {
             "type": "object",
             "properties": {
-                "city": {
-                    "type": "string",
-                    "description": "The name of the city"
-                },
-                "state": {
-                    "type": "string",
-                    "description": "The name of the state. Use capitalized two-letter codes for states, e.g., 'CA' for 'California'"
-                }
+                "city": {"type": "string", "description": config['functions']['lookup_city']['parameters']['city']},
+                "state": {"type": "string", "description": config['functions']['lookup_city']['parameters']['state']}
             },
             "required": ["city", "state"]
+        }
+    },
+    {
+        "name": "lookup_value",
+        "description": config['functions']['lookup_value']['description'],
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "geokey": {"type": "string", "description": config['functions']['lookup_value']['parameters']['geokey']},
+                "type": {"type": "string", "description": config['functions']['lookup_value']['parameters']['type']}
+            },
+            "required": ["geokey", "type"]
         }
     }
 ]
 
 @app.route('/ask', methods=['POST'])
 def ask_question():
+    app.logger.info("Ask begin")
     data = request.json
     question = data.get('question')
 
     messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "system", "content": config['system_message']},
         {"role": "user", "content": question}
     ]
 
-    while True:
+    for step in range(5):  # prevent infinite loop
         response = client.chat.completions.create(
-            model=OPENAI_MODEL,
+            model=os.getenv("OPENAI_MODEL"),
             messages=messages,
             functions=functions,
             function_call="auto"
@@ -63,17 +81,15 @@ def ask_question():
             function_name = message.function_call.name
             function_args = json.loads(message.function_call.arguments)
 
-            # Retrieve the function from the function_map
             function_to_call = function_map.get(function_name)
 
             if function_to_call:
-                # Call the function with the provided arguments
                 try:
+                    app.logger.info(f"{step+1}. Calling: {function_name}({message.function_call.arguments})")
                     function_response = function_to_call(**function_args)
                 except Exception as e:
                     function_response = {"error": str(e)}
             else:
-                # Function not found
                 function_response = {"error": f"Function '{function_name}' not found."}
 
             # Append the function response to the messages
@@ -86,9 +102,9 @@ def ask_question():
             # The assistant has provided a response; exit the loop
             break
 
-    # Return the assistant's reply
+    app.logger.info("Ask end")
     return jsonify({'response': message.content})
 
 # Start the Flask app
 if __name__ == '__main__':
-        app.run(host='0.0.0.0', port=5000, debug=True)
+        app.run(port=5000, debug=True)
