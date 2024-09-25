@@ -1,5 +1,6 @@
 import psycopg2
 import os
+import logging
 from typing import Dict, Tuple, Any
 
 # PostgreSQL database connection details
@@ -9,18 +10,24 @@ DB_NAME = os.getenv("DB_NAME")
 DB_USER = os.getenv("DB_USER")
 DB_PASSWORD = os.getenv("DB_PASSWORD")
 
-# Connect to PostgreSQL
+conn = None  # Initialize a global connection variable
+
 def get_db_connection():
-    conn = psycopg2.connect(
-        host=DB_HOST,
-        port=DB_PORT,
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASSWORD
-    )
+    global conn 
+
+    if conn is None or conn.closed:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            dbname=DB_NAME,
+            user=DB_USER,
+            password=DB_PASSWORD
+        )
     return conn
 
 def select(query: str, params: Tuple[Any, ...]) -> Dict[str, Any]:
+    logging.info(f"SELECT {params}")
+    
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute(query, params)
@@ -29,6 +36,8 @@ def select(query: str, params: Tuple[Any, ...]) -> Dict[str, Any]:
     result = cursor.fetchone()
     conn.close()
 
+    logging.info(f"SELECT complete")
+
     if result:
         return dict(zip(cols, result))
     else:
@@ -36,10 +45,7 @@ def select(query: str, params: Tuple[Any, ...]) -> Dict[str, Any]:
     
 # Function to lookup the population of a city in a state
 def lookup_city(city: str, state: str) -> Dict[str, Any]:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
+    query = """
         SELECT
             city, geokey AS city_geokey, 
             county, parentgeokey AS county_geokey,
@@ -49,41 +55,23 @@ def lookup_city(city: str, state: str) -> Dict[str, Any]:
         WHERE LOWER(city)=LOWER(%s) AND state=%s
         ORDER BY source_table, population DESC NULLS LAST
         LIMIT 1
-        """, (city, state))
+        """
+    params =  (city, state)
     
-    cols = [desc[0] for desc in cursor.description]
-    result = cursor.fetchone()
-    conn.close()
+    return select(query, params)
 
-    if result:
-        return dict(zip(cols, result))
-    else:
-        return {}
-
-
-
-# Define the function that OpenAI will call
 def lookup_value(geokey: str, type: str) -> Dict[str, Any]:
     type = type.lower() + '5yr'
     
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute(
-        """
+    query = """
         SELECT DISTINCT ON (geokey) geokey, REPLACE(type, '5Yr', '') AS type, date::text, value
         FROM GeoDataP
         WHERE GeoKey = %s AND LOWER(Type) = %s
         ORDER BY geokey, date DESC;
-        """, (geokey, type))
+        """
+    params = (geokey, type)
     
-    cols = [desc[0] for desc in cursor.description]
-    result = cursor.fetchone()
-    conn.close()
-
-    if result:
-        return dict(zip(cols, result))
-    else:
-        return {}
+    return select(query, params)
 
 if __name__ == '__main__':
     spec = lookup_city('Palo Alto', 'CA')

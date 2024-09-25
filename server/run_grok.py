@@ -7,7 +7,7 @@ import os
 import logging
 from typing import Dict, Any
 
-from db import lookup_city, lookup_value
+from db import get_db_connection, lookup_city, lookup_value
 
 app = Flask(__name__)
 
@@ -18,9 +18,13 @@ logging.basicConfig(
 )
 app.debug = True
 
+get_db_connection()  # pre-open
+
 @tool
 def lookup_city_tool(city: str, state: str) -> Dict[str, Any]:
     '''Lookup the JSON specification of the given city, state.
+    
+    Args:
     - city (str): The name of a city, e.g. "San Francisco".
     - state (str): The 2 capital letter code for the state, e.g. "CA".  
                    If a user specifies the full state name (e.g. "California"), pass it in here as "CA".
@@ -53,6 +57,8 @@ def lookup_city_tool(city: str, state: str) -> Dict[str, Any]:
 @tool
 def lookup_value_tool(geokey: str, type: str) -> Dict[str, Any]:
     '''Fetch the latest value for the passed in type for the city (or county or state) identified by geokey.
+    
+    Args:
     - geokey (str): The geokey for the city (or county or state).  The "lookup_city_tool" tool can be used
                     to find geokey.  For a city, geokey is FIPS State code + FIPS City code, so the user
                     could also simply used the Geokey in a question without looking it up.

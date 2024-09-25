@@ -20,6 +20,7 @@ functions:
   lookup_city:
     description: >
       Lookup the JSON specification of the given city and state.
+
       Here is a sample return dict:
       
       {
@@ -56,18 +57,18 @@ functions:
       Fetch the latest value for the passed in type for the city (or county or state)
       identified by geokey.
                         
-          Here is a sample return dict:
-          
-          { 
-              'geokey': '0655282', 
-              'type': 'Population', 
-              'date': '2022-01-01', 
-              'value': 67901.0
-          }
-          
-          The date tells you the date of the latest reading.
-          
-          An empty dict {} is returned for not found.
+      Here is a sample return dict:
+      
+      { 
+          'geokey': '0655282', 
+          'type': 'Population', 
+          'date': '2022-01-01', 
+          'value': 67901.0
+      }
+      
+      The date tells you the date of the latest reading.
+      
+      An empty dict {} is returned for not found.
     parameters:
       geokey:
         The geokey for the city (or county or state).  The "lookup_city" function can be used

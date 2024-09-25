@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Dict, Any
 
-from db import lookup_city, lookup_value
+from db import get_db_connection, lookup_city, lookup_value
 
 app = Flask(__name__)
 
@@ -16,6 +16,8 @@ logging.basicConfig(
     handlers=[logging.StreamHandler()]
 )
 app.debug = True
+
+get_db_connection()  # pre-open
 
 with open('config.yaml', 'r') as f:
     config = yaml.safe_load(f)
