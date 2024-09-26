@@ -67,6 +67,7 @@ def ask_question():
         {"role": "user", "content": question}
     ]
 
+    num_tokens = 0
     for step in range(5):  # prevent infinite loop
         response = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL"),
@@ -74,6 +75,7 @@ def ask_question():
             functions=functions,
             function_call="auto"
         )
+        num_tokens += response.usage.total_tokens
 
         message = response.choices[0].message
         messages.append({"role": message.role, "content": message.content or "", "function_call": message.function_call})
@@ -104,7 +106,7 @@ def ask_question():
             # The assistant has provided a response; exit the loop
             break
 
-    app.logger.info("Ask end")
+    app.logger.info(f"Ask end: {num_tokens} tokens used")
     return jsonify({'response': message.content})
 
 # Start the Flask app

@@ -27,24 +27,22 @@ with open('config.yaml', 'r') as f:
 @tool
 def lookup_city_tool(city: str, state: str) -> Dict[str, Any]:
     '''TBD'''
-    
-    lookup_city_tool.__doc__ = \
-        config['functions']['lookup_city']['description'] % \
-        config['functions']['lookup_city']['args']
- 
     spec = lookup_city(city, state)
     return spec
     
+lookup_city_tool.description = \
+        config['functions']['lookup_city']['description'] % \
+        config['functions']['lookup_city']['args']
+
 @tool
 def lookup_value_tool(geokey: str, type: str) -> Dict[str, Any]:
     '''TBD'''
-    
-    lookup_value_tool.__doc__ = \
-        config['functions']['lookup_value']['description'] % \
-        config['functions']['lookup_value']['args']
- 
     spec = lookup_value(geokey, type)
     return spec
+
+lookup_value_tool.description = \
+        config['functions']['lookup_value']['description'] % \
+        config['functions']['lookup_value']['args']
 
 functions_map = {
     "lookup_city_tool": lookup_city_tool,

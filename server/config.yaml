@@ -86,7 +86,7 @@ functions:
       Args:
       - geokey (str): The geokey for the city (or county or state).  The "lookup_city_tool" tool can be used
                       to find geokey.  For a city, geokey is FIPS State code + FIPS City code, so the user
-                      could also simply used the Geokey in a question without looking it up.
+                      could also simply used the geokey in a question without looking it up.
       - type (str): The type of the value being looked up.  Available types are:
       
           Population
@@ -102,8 +102,8 @@ functions:
     parameters:
       geokey:
         The geokey for the city (or county or state).  The "lookup_city" function can be used
-          to find geokey.  For a city, geokey is FIPS State code + FIPS City code, so the user
-          could also simply used the Geokey in a question without looking it up.
+        to find geokey.  For a city, geokey is FIPS State code + FIPS City code, so the user
+        could also simply used the geokey in a question without looking it up.
       type: >
         The type of the value being looked up.  Available types are:
     
