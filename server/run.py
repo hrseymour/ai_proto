@@ -1,8 +1,8 @@
 from flask import Flask, request, jsonify
 from openai import OpenAI
-import yaml
 import os
 import json
+import yaml
 import logging
 from typing import Dict, Any
 
@@ -32,7 +32,7 @@ function_map = {
 functions = [
     {
         "name": "lookup_city",
-        "description": config['functions']['lookup_city']['description'],
+        "description": config['functions']['lookup_city']['description'] % "",
         "parameters": {
             "type": "object",
             "properties": {
@@ -44,7 +44,7 @@ functions = [
     },
     {
         "name": "lookup_value",
-        "description": config['functions']['lookup_value']['description'],
+        "description": config['functions']['lookup_value']['description'] % "",
         "parameters": {
             "type": "object",
             "properties": {

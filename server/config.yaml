@@ -21,6 +21,8 @@ functions:
     description: >
       Lookup the JSON specification of the given city and state.
 
+      %s
+
       Here is a sample return dict:
       
       {
@@ -42,6 +44,13 @@ functions:
       
       An empty dict {} is returned for not found.
 
+    args: >
+      Args:
+        - city (str): The name of a city, e.g. "San Francisco".
+        - state (str): The 2 capital letter code for the state, e.g. "CA".  
+                      If a user specifies the full state name (e.g. "California"), pass it in here as "CA".
+                      If the state is not specified, do your best to infer it.
+
     parameters:
       city:
         The name of the city to lookup, e.g. "San Francisco".
@@ -52,10 +61,13 @@ functions:
       required:
         - city
         - state
+  
   lookup_value:
     description: >
       Fetch the latest value for the passed in type for the city (or county or state)
       identified by geokey.
+
+      %s
                         
       Here is a sample return dict:
       
@@ -69,6 +81,24 @@ functions:
       The date tells you the date of the latest reading.
       
       An empty dict {} is returned for not found.
+
+    args: >
+      Args:
+      - geokey (str): The geokey for the city (or county or state).  The "lookup_city_tool" tool can be used
+                      to find geokey.  For a city, geokey is FIPS State code + FIPS City code, so the user
+                      could also simply used the Geokey in a question without looking it up.
+      - type (str): The type of the value being looked up.  Available types are:
+      
+          Population
+          BachelorsRate
+          BelowPovertyRate
+          LaborForceRate
+          MedianHomeValue
+          PerCapitaIncome
+          PopulationMedianAge
+          RentOccupiedRatio
+          UnemploymentRate
+
     parameters:
       geokey:
         The geokey for the city (or county or state).  The "lookup_city" function can be used
@@ -87,4 +117,8 @@ functions:
           RentOccupiedRatio
           UnemploymentRate
           
-        The meaning of the type names is self-explanatory.  
+        The meaning of the type names is self-explanatory.
+
+      required:
+        - geokey
+        - type

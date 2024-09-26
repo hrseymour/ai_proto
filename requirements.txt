@@ -4,3 +4,4 @@ Flask==3.0.3
 openai==1.48.0
 pandas==2.2.3
 psycopg2_binary==2.9.9
+PyYAML==6.0.2
