@@ -29,29 +29,35 @@ function_map = {
     'lookup_value': lookup_value,
 }
 
-functions = [
+tools = [
     {
-        "name": "lookup_city",
-        "description": config['functions']['lookup_city']['description'] % "",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "city": {"type": "string", "description": config['functions']['lookup_city']['parameters']['city']},
-                "state": {"type": "string", "description": config['functions']['lookup_city']['parameters']['state']}
-            },
-            "required": ["city", "state"]
+        "type": "function",
+        "function": {
+            "name": "lookup_city",
+            "description": config['functions']['lookup_city']['description'] % "",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "city": {"type": "string", "description": config['functions']['lookup_city']['parameters']['city']},
+                    "state": {"type": "string", "description": config['functions']['lookup_city']['parameters']['state']}
+                },
+                "required": ["city", "state"]
+            }
         }
     },
     {
-        "name": "lookup_value",
-        "description": config['functions']['lookup_value']['description'] % "",
-        "parameters": {
-            "type": "object",
-            "properties": {
-                "geokey": {"type": "string", "description": config['functions']['lookup_value']['parameters']['geokey']},
-                "type": {"type": "string", "description": config['functions']['lookup_value']['parameters']['type']}
-            },
-            "required": ["geokey", "type"]
+        "type": "function",
+        "function": {
+            "name": "lookup_value",
+            "description": config['functions']['lookup_value']['description'] % "",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "geokey": {"type": "string", "description": config['functions']['lookup_value']['parameters']['geokey']},
+                    "type": {"type": "string", "description": config['functions']['lookup_value']['parameters']['type']}
+                },
+                "required": ["geokey", "type"]
+            }
         }
     }
 ]
@@ -72,37 +78,49 @@ def ask_question():
         response = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL"),
             messages=messages,
-            functions=functions,
-            function_call="auto"
+            tools=tools,
+            tool_choice="auto"
         )
         num_tokens += response.usage.total_tokens
 
         message = response.choices[0].message
-        if not message.function_call:
-            messages.append({"role": message.role, "content": message.content or ""})
+        messages.append({"role": "assistant", "content": message.content or ""})
 
-        if message.function_call is not None:
-            # The assistant is requesting a function call
-            function_name = message.function_call.name
-            function_args = json.loads(message.function_call.arguments)
+        if message.tool_calls:
+            for tool_call in message.tool_calls:
+                function_name = tool_call.function.name
+                function_args = json.loads(tool_call.function.arguments)
 
-            function_to_call = function_map.get(function_name)
+                function_to_call = function_map.get(function_name)
 
-            if function_to_call:
-                try:
-                    app.logger.info(f"{step+1}. Calling: {function_name}({function_args})")
-                    function_response = function_to_call(**function_args)
-                except Exception as e:
-                    function_response = {"error": str(e)}
-            else:
-                function_response = {"error": f"Function '{function_name}' not found."}
+                if function_to_call:
+                    try:
+                        app.logger.info(f"{step+1}. Calling: {function_name}({function_args})")
+                        function_response = function_to_call(**function_args)
+                    except Exception as e:
+                        function_response = {"error": str(e)}
+                else:
+                    function_response = {"error": f"Function '{function_name}' not found."}
 
-            # Append the function response to the messages
-            messages.append({
-                "role": "function",
-                "name": function_name,
-                "content": json.dumps(function_response)
-            })
+                # Append the function call to messages
+                messages.append({
+                    "role": "assistant",
+                    "content": None,
+                    "tool_calls": [
+                        {
+                            "id": tool_call.id,
+                            "type": "function",
+                            "function": {"name": function_name, "arguments": tool_call.function.arguments}
+                        }
+                    ]
+                })
+
+                # Append the function response to messages
+                messages.append({
+                    "role": "tool",
+                    "content": json.dumps(function_response),
+                    "tool_call_id": tool_call.id
+                })
         else:
             # The assistant has provided a response; exit the loop
             break
