@@ -78,7 +78,8 @@ def ask_question():
         num_tokens += response.usage.total_tokens
 
         message = response.choices[0].message
-        messages.append({"role": message.role, "content": message.content or "", "function_call": message.function_call})
+        if not message.function_call:
+            messages.append({"role": message.role, "content": message.content or ""})
 
         if message.function_call is not None:
             # The assistant is requesting a function call
@@ -89,7 +90,7 @@ def ask_question():
 
             if function_to_call:
                 try:
-                    app.logger.info(f"{step+1}. Calling: {function_name}({message.function_call.arguments})")
+                    app.logger.info(f"{step+1}. Calling: {function_name}({function_args})")
                     function_response = function_to_call(**function_args)
                 except Exception as e:
                     function_response = {"error": str(e)}
