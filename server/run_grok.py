@@ -4,11 +4,12 @@ from langchain_core.messages import AIMessage, SystemMessage, HumanMessage, Tool
 from langchain_groq import ChatGroq
 
 import os
+import json
 import yaml
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, List
 
-from db import init_db_pool, lookup_city, lookup_value
+from db import init_db_pool, lookup_city, lookup_values
 
 app = Flask(__name__)
 
@@ -35,18 +36,18 @@ lookup_city_tool.description = \
         config['functions']['lookup_city']['args']
 
 @tool
-def lookup_value_tool(geokey: str, type: str) -> Dict[str, Any]:
+def lookup_values_tool(geokey: str, types: List[str]) -> List[Dict[str, Any]]:
     '''TBD'''
-    spec = lookup_value(geokey, type)
+    spec = lookup_values(geokey, types)
     return spec
 
-lookup_value_tool.description = \
-        config['functions']['lookup_value']['description'] % \
-        config['functions']['lookup_value']['args']
+lookup_values_tool.description = \
+        config['functions']['lookup_values']['description'] % \
+        config['functions']['lookup_values']['args']
 
 functions_map = {
     "lookup_city_tool": lookup_city_tool,
-    "lookup_value_tool": lookup_value_tool
+    "lookup_values_tool": lookup_values_tool
 }
 
 def call_functions(llm_with_tools, user_prompt):
@@ -66,7 +67,11 @@ def call_functions(llm_with_tools, user_prompt):
                 continue
 
             app.logger.info(f'{step+1}. Calling: {tool_call["name"]}({tool_call["args"]})')
+
             tool_output = selected_tool.invoke(tool_call["args"])
+            if not isinstance(tool_output, str):
+                tool_output = json.dumps(tool_output)
+
             messages.append(ToolMessage(tool_output, tool_call_id=tool_call["id"]))
 
     final_answer = messages[-1].content \

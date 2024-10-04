@@ -1,11 +1,11 @@
 system_message: >
   You are a helpful assistant that answers questions about cities.  It is usually a two step process
   to lookup numerical values like population.  Use "lookup_city" to find a geokey for a city.  Then
-  use "lookup_value" to lookup a value like population.  For example, if someone asks "What is the
+  use "lookup_values" to lookup a value like population.  For example, if someone asks "What is the
   population of Palo Alto, California"?  You will call:
   
   lookup_city("Palo Alto", "CA")
-  lookup_value("0655282", "Population")
+  lookup_values("0655282", "Population")
   
   The first call returns city_geokey for you ("0655282") and the second call returns the population
   that was requested (e.g. 67901).
@@ -37,7 +37,7 @@ functions:
           'source_table': 1
       }
       
-      The geokey keys are used to lookup values using the "lookup_value" function, which can lookup
+      The geokey keys are used to lookup values using the "lookup_values" function, which can lookup
       socio-economic values for the city, county or state (using their geokey).
       
       The returned JSON spec (dict) also teaches you values like: county, latitude and longitude.
@@ -62,32 +62,34 @@ functions:
         - city
         - state
   
-  lookup_value:
+  lookup_values:
     description: >
-      Fetch the latest value for the passed in type for the city (or county or state)
+      Fetch the latest values for the passed in types for the city (or county or state)
       identified by geokey.
 
       %s
                         
       Here is a sample return dict:
       
-      { 
+      [
+        { 
           'geokey': '0655282', 
           'type': 'Population', 
           'date': '2022-01-01', 
           'value': 67901.0
-      }
-      
+        }
+      ]
+
       The date tells you the date of the latest reading.
       
-      An empty dict {} is returned for not found.
+      An empty array is returned if no values are found.
 
     args: >
       Args:
       - geokey (str): The geokey for the city (or county or state).  The "lookup_city_tool" tool can be used
                       to find geokey.  For a city, geokey is FIPS State code + FIPS City code, so the user
                       could also simply used the geokey in a question without looking it up.
-      - type (str): The type of the value being looked up.  Available types are:
+      - types (List[str]): A list of the types of the values being looked up.  Available types are:
       
           Population
           BachelorsRate
@@ -104,8 +106,8 @@ functions:
         The geokey for the city (or county or state).  The "lookup_city" function can be used
         to find geokey.  For a city, geokey is FIPS State code + FIPS City code, so the user
         could also simply used the geokey in a question without looking it up.
-      type: >
-        The type of the value being looked up.  Available types are:
+      types: >
+        A list of the types of the values being looked up.  Available types are:
     
           Population
           BachelorsRate
@@ -121,4 +123,4 @@ functions:
 
       required:
         - geokey
-        - type
+        - types

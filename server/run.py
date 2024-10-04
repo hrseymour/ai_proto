@@ -6,7 +6,7 @@ import yaml
 import logging
 from typing import Dict, Any
 
-from db import init_db_pool, lookup_city, lookup_value
+from db import init_db_pool, lookup_city, lookup_values
 
 app = Flask(__name__)
 
@@ -26,7 +26,7 @@ client = OpenAI(api_key=os.getenv("OPEN_API_KEY"))
 
 function_map = {
     'lookup_city': lookup_city,
-    'lookup_value': lookup_value,
+    'lookup_values': lookup_values,
 }
 
 tools = [
@@ -48,15 +48,21 @@ tools = [
     {
         "type": "function",
         "function": {
-            "name": "lookup_value",
-            "description": config['functions']['lookup_value']['description'] % "",
+            "name": "lookup_values",
+            "description": config['functions']['lookup_values']['description'] % "",
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "geokey": {"type": "string", "description": config['functions']['lookup_value']['parameters']['geokey']},
-                    "type": {"type": "string", "description": config['functions']['lookup_value']['parameters']['type']}
+                    "geokey": {"type": "string", "description": config['functions']['lookup_values']['parameters']['geokey']},
+                    "types": {
+                        "type": "array", 
+                        "description": config['functions']['lookup_values']['parameters']['types'],
+                        "items": {
+                            "type": "string"
+                        }
+                    }
                 },
-                "required": ["geokey", "type"]
+                "required": ["geokey", "types"]
             }
         }
     }
@@ -68,9 +74,20 @@ def ask_question():
     data = request.json
     question = data.get('question')
 
+    # Basic sanitization: limiting length and removing dangerous phrases
+    MAX_QUESTION_LENGTH = 320
+    dangerous_phrases = ["ignore all", "disregard", "forget previous"]
+
+    if not question or len(question) > MAX_QUESTION_LENGTH:
+        return jsonify({"error": "Invalid question"}), 400
+
+    for phrase in dangerous_phrases:
+        if phrase in question.lower():
+            return jsonify({"error": "Invalid question"}), 400
+
     messages = [
         {"role": "system", "content": config['system_message']},
-        {"role": "user", "content": question}
+        {"role": "user", "content": "The user wants to ask: " + question}
     ]
 
     num_tokens = 0

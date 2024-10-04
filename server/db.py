@@ -1,7 +1,7 @@
 from psycopg2 import pool
 import os
 import logging
-from typing import Dict, Tuple, Any
+from typing import Dict, Tuple, Any, List
 
 # PostgreSQL database connection details
 DB_HOST = os.getenv("DB_HOST")
@@ -37,7 +37,7 @@ def release_db_connection(conn):
     if connection_pool:
         connection_pool.putconn(conn)
 
-def select(query: str, params: Tuple[Any, ...]) -> Dict[str, Any]:
+def select(query: str, params: Tuple[Any, ...]) -> List[Dict[str, Any]]:
     logging.info(f"SELECT {params}")
     
     conn = get_db_connection()
@@ -45,16 +45,13 @@ def select(query: str, params: Tuple[Any, ...]) -> Dict[str, Any]:
     
     cursor.execute(query, params)
     cols = [desc[0] for desc in cursor.description]
-    result = cursor.fetchone()
+    results = cursor.fetchall()
 
     release_db_connection(conn)  # Return connection to pool
 
     logging.info(f"SELECT complete")
 
-    if result:
-        return dict(zip(cols, result))
-    else:
-        return {}
+    return [dict(zip(cols, row)) for row in results] if results else []
     
 # Function to lookup the population of a city in a state
 def lookup_city(city: str, state: str) -> Dict[str, Any]:
@@ -69,24 +66,29 @@ def lookup_city(city: str, state: str) -> Dict[str, Any]:
         ORDER BY source_table, population DESC NULLS LAST
         LIMIT 1
         """
-    params =  (city, state)
     
-    return select(query, params)
+    params =  (city, state)
+    cities = select(query, params)
+    return cities[0] if cities else {}
 
-def lookup_value(geokey: str, type: str) -> Dict[str, Any]:
-    type = type.lower() + '5yr'
+def lookup_values(geokey: str, types: List[str]) -> List[Dict[str, Any]]:
+    types = [t.lower() + '5yr' for t in types]
     
     query = """
-        SELECT DISTINCT ON (geokey) geokey, REPLACE(type, '5Yr', '') AS type, date::text, value
+        SELECT DISTINCT ON (geokey, type) 
+            geokey, 
+            REPLACE(type, '5Yr', '') AS type, 
+            date::text, 
+            value
         FROM GeoDataP
-        WHERE GeoKey = %s AND LOWER(Type) = %s
-        ORDER BY geokey, date DESC;
+        WHERE GeoKey = %s AND LOWER(Type) IN %s
+        ORDER BY geokey, type, date DESC;
         """
-    params = (geokey, type)
-    
+
+    params = (geokey, tuple(types))
     return select(query, params)
 
 if __name__ == '__main__':
     spec = lookup_city('Palo Alto', 'CA')
-    pop = lookup_value(spec['city_geokey'], 'Population')
+    pop = lookup_values(spec['city_geokey'], ['Population', 'BachelorsRate'])
     print (pop)
