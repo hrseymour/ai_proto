@@ -4,7 +4,9 @@ import os
 import json
 import yaml
 import logging
-from typing import Dict, Any
+# Gradio
+import gradio as gr
+import threading
 
 from db import init_db_pool, lookup_city, lookup_values
 
@@ -68,27 +70,31 @@ tools = [
     }
 ]
 
-@app.route('/ask', methods=['POST'])
-def ask_question():
+def process_conversation(question, history=None):
     app.logger.info("Ask begin")
-    data = request.json
-    question = data.get('question')
 
     # Basic sanitization: limiting length and removing dangerous phrases
     MAX_QUESTION_LENGTH = 320
     dangerous_phrases = ["ignore all", "disregard", "forget previous"]
 
     if not question or len(question) > MAX_QUESTION_LENGTH:
-        return jsonify({"error": "Invalid question"}), 400
+        return {"error": "Invalid question"}
 
     for phrase in dangerous_phrases:
         if phrase in question.lower():
-            return jsonify({"error": "Invalid question"}), 400
+            return {"error": "Invalid question"}
 
     messages = [
-        {"role": "system", "content": config['system_message']},
-        {"role": "user", "content": "The user wants to ask: " + question}
+        {"role": "system", "content": config['system_message']}
     ]
+
+    # Add history to messages if provided
+    if history:
+        for entry in history:
+            messages.append({"role": "user", "content": entry["question"]})
+            messages.append({"role": "assistant", "content": entry["response"]})
+
+    messages.append({"role": "user", "content": "The user wants to ask: " + question})
 
     num_tokens = 0
     for step in range(5):  # prevent infinite loop
@@ -143,8 +149,62 @@ def ask_question():
             break
 
     app.logger.info(f"Ask end: {num_tokens} tokens used")
-    return jsonify({'response': message.content})
+    return {"response": message.content}
 
-# Start the Flask app
+@app.route('/ask', methods=['POST'])
+def ask_question():
+    data = request.json
+    question = data.get('question')
+    history = data.get('history', [])
+
+    result = process_conversation(question, history)
+    return jsonify(result)
+
+# Gradio UI
+def gradio_chat(message, history):
+    history_dict = [{"question": q, "response": r} for q, r in history]
+    result = process_conversation(message, history_dict)
+    return result["response"]
+
+def new_conversation():
+    return None
+
+with gr.Blocks() as iface:
+    chatbot = gr.Chatbot(height=800)
+    with gr.Column():
+        msg = gr.Textbox(
+            label="What's your question about US cities?",
+            placeholder="Type your question here...",
+            lines=2
+        )
+        with gr.Row():
+            send_btn = gr.Button("Send", size="sm")
+            new_btn = gr.Button("New", size="sm")
+
+    def user(user_message, history):
+        return "", history + [[user_message, None]]
+
+    def bot(history):
+        user_message = history[-1][0]
+        bot_message = gradio_chat(user_message, history[:-1])
+        history[-1][1] = bot_message
+        return history
+
+    msg.submit(user, [msg, chatbot], [msg, chatbot], queue=False).then(
+        bot, chatbot, chatbot
+    )
+    send_btn.click(user, [msg, chatbot], [msg, chatbot], queue=False).then(
+        bot, chatbot, chatbot
+    )
+    new_btn.click(new_conversation, None, chatbot, queue=False)
+
+# Start the Flask app and Gradio UI
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+    def run_flask():
+        app.run(host='0.0.0.0', port=8080, debug=False)
+
+    flask_thread = threading.Thread(target=run_flask)
+    flask_thread.start()
+
+    # Launch Gradio UI
+    iface.launch(server_name="0.0.0.0", server_port=8081)
