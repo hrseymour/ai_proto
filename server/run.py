@@ -95,21 +95,23 @@ def process_conversation(question, history=None, function_history=None):
             messages.append({"role": "assistant", "content": assistant_msg})
             
             # Include function calls from function_history
-            if function_history and i < len(function_history):
-                for func_call in function_history[i]:
-                    messages.append({
-                        "role": "assistant",
-                        "content": None,
-                        "function_call": {
-                            "name": func_call["name"],
-                            "arguments": json.dumps(func_call["arguments"])
-                        }
-                    })
-                    messages.append({
-                        "role": "function",
+            if not function_history or i >= len(function_history):
+                continue
+
+            for func_call in function_history[i]:
+                messages.append({
+                    "role": "assistant",
+                    "content": None,
+                    "function_call": {
                         "name": func_call["name"],
-                        "content": json.dumps(func_call["response"])
-                    })
+                        "arguments": json.dumps(func_call["arguments"])
+                    }
+                })
+                messages.append({
+                    "role": "function",
+                    "name": func_call["name"],
+                    "content": json.dumps(func_call["response"])
+                })
 
     messages.append({"role": "user", "content": "The user wants to ask: " + question})
 
