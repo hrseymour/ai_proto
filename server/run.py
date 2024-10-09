@@ -70,7 +70,7 @@ tools = [
     }
 ]
 
-def process_conversation(question, history=None):
+def process_conversation(question, history=None, function_history=None):
     app.logger.info("Ask begin")
 
     # Basic sanitization: limiting length and removing dangerous phrases
@@ -90,13 +90,31 @@ def process_conversation(question, history=None):
 
     # Add history to messages if provided
     if history:
-        for entry in history:
-            messages.append({"role": "user", "content": entry["question"]})
-            messages.append({"role": "assistant", "content": entry["response"]})
+        for i, (user_msg, assistant_msg) in enumerate(history):
+            messages.append({"role": "user", "content": user_msg})
+            messages.append({"role": "assistant", "content": assistant_msg})
+            
+            # Include function calls from function_history
+            if function_history and i < len(function_history):
+                for func_call in function_history[i]:
+                    messages.append({
+                        "role": "assistant",
+                        "content": None,
+                        "function_call": {
+                            "name": func_call["name"],
+                            "arguments": json.dumps(func_call["arguments"])
+                        }
+                    })
+                    messages.append({
+                        "role": "function",
+                        "name": func_call["name"],
+                        "content": json.dumps(func_call["response"])
+                    })
 
     messages.append({"role": "user", "content": "The user wants to ask: " + question})
 
     num_tokens = 0
+    function_calls = []
     for step in range(5):  # prevent infinite loop
         response = client.chat.completions.create(
             model=os.getenv("OPENAI_MODEL"),
@@ -144,12 +162,19 @@ def process_conversation(question, history=None):
                     "content": json.dumps(function_response),
                     "tool_call_id": tool_call.id
                 })
+
+                # Store function calls for history
+                function_calls.append({
+                    "name": function_name,
+                    "arguments": function_args,
+                    "response": function_response
+                })
         else:
             # The assistant has provided a response; exit the loop
             break
 
     app.logger.info(f"Ask end: {num_tokens} tokens used")
-    return {"response": message.content}
+    return {"response": message.content, "function_calls": function_calls}
 
 @app.route('/ask', methods=['POST'])
 def ask_question():
@@ -161,16 +186,14 @@ def ask_question():
     return jsonify(result)
 
 # Gradio UI
-def gradio_chat(message, history):
-    history_dict = [{"question": q, "response": r} for q, r in history]
-    result = process_conversation(message, history_dict)
-    return result["response"]
-
-def new_conversation():
-    return None
+def chat(message, history, function_history):
+    result = process_conversation(message, history, function_history)
+    function_history.append(result.get("function_calls", []))
+    return result["response"], function_history
 
 with gr.Blocks() as iface:
     chatbot = gr.Chatbot(height=800)
+    function_history = gr.State([])
     with gr.Column():
         msg = gr.Textbox(
             label="What's your question about US cities?",
@@ -184,19 +207,22 @@ with gr.Blocks() as iface:
     def user(user_message, history):
         return "", history + [[user_message, None]]
 
-    def bot(history):
+    def bot(history, function_history):
         user_message = history[-1][0]
-        bot_message = gradio_chat(user_message, history[:-1])
+        bot_message, updated_function_history = chat(user_message, history[:-1], function_history)
         history[-1][1] = bot_message
-        return history
+        return history, updated_function_history
+
+    def new_conversation():
+        return None, []
 
     msg.submit(user, [msg, chatbot], [msg, chatbot], queue=False).then(
-        bot, chatbot, chatbot
+        bot, [chatbot, function_history], [chatbot, function_history]
     )
     send_btn.click(user, [msg, chatbot], [msg, chatbot], queue=False).then(
-        bot, chatbot, chatbot
+        bot, [chatbot, function_history], [chatbot, function_history]
     )
-    new_btn.click(new_conversation, None, chatbot, queue=False)
+    new_btn.click(new_conversation, None, [chatbot, function_history], queue=False)
 
 # Start the Flask app and Gradio UI
 if __name__ == '__main__':

@@ -61,7 +61,7 @@ def lookup_city(city: str, state: str) -> Dict[str, Any]:
             county, parentgeokey AS county_geokey,
             state, SUBSTR(geokey, 1, 2) AS state_geokey,
             longitude, latitude, source_table
-        FROM geoplaceview 
+        FROM GeoPlaceViewAlt
         WHERE LOWER(city)=LOWER(%s) AND state=%s
         ORDER BY source_table, population DESC NULLS LAST
         LIMIT 1
